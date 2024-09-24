@@ -1,0 +1,1781 @@
+Monolythe Architecture 
+- Built as a single unit
+- Also when we want to scale the code, we have to duplicate it on each server and the whole system runs into same adress.
+
+Against it Microservices
+
+Segregate functionallity into smaller parts, seperates services with a single responsiblity. 
+Scales out by deploying each service independantly 
+Loosely coupled 
+Enables autonomous development by different languages and plattforms. 
+Every microservice can own its own data/database.
+
+Break the app in small units.
+
+Microservices Concepts
+
+Cloud native (Cloud native foundation)
+
+Takes Advantages of modern development technologies and cloud infrastructure
+One way how microservices can communicate which each other is a service mesh. (Later more)
+The communication is necessary, therefor that the Code is properly working together in the application, independent of the language or operation system the teams are using.
+A Vendor neutral project is independent from a single Company offer or a single functionallity.
+
+The application architecture looks like this:
+
+Kubernetes Patterns
+  - Microservide Pinciples
+      - Domain Driven Design
+          - Clean Code
+The infrastructure will be immutable and can be thrown away, that means it will never been updated or repaired, but it will be directly builded and provisioned new.
+
+Steps for using microservices, different information I grepped and used
+
+1. Containerization
+Can be done over docker and directly from the code like I made it in the tmg-app or I can build the image directly in gitlab how in my next-app. Or any other devops tool like azure devops. 
+
+2. CI/CD Continous Integration and Continous deployment or delivery.
+The service I used was gitlab. It is easy to use, other possibilities are jenkins or directly azure devops or github actions, what I used in the gulp project. Perhaps this is the most convenient, because we already working with github.
+  Ci/CD changes the source code automatically in a new container buing build, tested and deployed to staging. 
+
+  Example out of my next-app, gitlab-ci.yml must be set in the root of the application after building one dockerfile in this case:
+  cache: // must be not loaded every time
+  key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+  paths:
+    - roman_blog/node_modules/
+variables: // variables for setting in the build image
+  IMAGE_NAME: romanarmin/next_blog
+  IMAGE_TAG: v1 
+before_script: // before the cript i change in the sub-directory and install the packages
+    - cd roman_blog
+    - npm install
+stages: // are responsible for the execution of the jobs in the correct order
+  - test
+  - build
+run_jest_tests: // ( first job testing)
+  stage: test
+  image: node:lts-alpine
+  script:
+    - npm run test
+build_image: // build with docker in docker
+  stage: build
+  image: docker:27.0.0-rc.1-alpine3.20
+  services:
+    - docker:27.0.0-rc.1-dind-alpine3.20
+  variables:
+    DOCKER_TLS_CERT_DIR: "/certs"
+  before_script: // login with secret variables in the settings repository
+  - docker login -u $REGISTRY_USER -p $REGISTRY_PASSWORD
+  script:
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG -f roman_blog/Dockerfile roman_blog
+    - docker push $IMAGE_NAME:$IMAGE_TAG 
+
+In the CI/CD we setup autmated rollouts, roll backs and testing.
+Here was mentioned that argo is a set of kubernetes-native-tools for deploying and running jobs, apps workflows gitOps and paradigms such as contineous and progeressive delivery and MCops.
+
+3. Orchestration & Application Definition
+Made with kubernetes by using a certified kubernetes destribution, hosted plattform or helm charts, which help me to define, install and upgrade every and also complex kubernetes application
+
+4. Observability & Analysis
+Pick solutions for monitoring (prometheus), logging(Fluentd), and tracking(Jaeger)
+
+5. Service Proxy, Discovery and mesh
+service discovery (Bsp CoreDns)
+mesh architecture (Linkend)
+
+6. Streaming & Messaging
+
+Container Concepts
+A container is a unit of deployment with high portability, isolation and much faster because containers not have to boot and use less memory.
+Structure:
+  Container
+    - Application
+    - Customization
+    - Base OS 
+
+Containers are made of layers which have a unique id. So when we load a second version of an image docker only changes the layers that not already exists.
+Here’s a simplified breakdown:
+
+Layer 1: Adds the basic filesystem and essential components.
+Layer 2: Installs additional software or dependencies.
+Layer 3: Copies your application’s code or files into the image.
+Each layer is immutable, meaning once it’s created, it doesn’t change. When you run a container, Docker stacks these layers to create a single, unified filesystem. This approach allows for efficient reuse and sharing of layers among different images, saving space and speeding up deployments.
+
+Container Registry 
+
+Centralized Containers repository
+
+Github, DockerHub or the cloud providers have container REGISTRY_USER
+
+Orchestrators have to:
+  Manage the:
+    - infrastructure
+    - containers
+    - Deployment
+    - Scaling
+    - failover
+    - health monitoring
+    - app upgrades
+
+azure kubernetes service offers a orchestration as a service, like all other cloud providers, but this is a question of the costs. So we can setup our own kubernetes and then taking the loadBalancer from the cloudprovider as well as the cluster to deploy our apps.
+
+container runtime is a bundler for the containers
+
+Docker CLI Commands
+
+docker info for system info
+
+docker version for the version
+
+docker login for Registry
+
+docker pull [imagename] for getting an image from a existing repository
+
+docker run [imagename] for running containers
+
+docker run -d [imagename] for detached mode
+
+docker ps list running containers
+
+docker ps -a list all Containers
+
+docker stop [containername] for stop containers
+
+docker kill [containername] for kill a container
+
+docker image inspect [imagename] for inspecting image
+
+docker rm [containername] for removing a container, for that it must be stopped
+
+docker rm $(docker ps-a-q) removes all stopped containers
+
+docker images list all images
+
+docker rmi [imagename] removes an image, for thst the container has to be removed first
+
+docker system prune -a Removes all images not in use
+
+docker [containername] exec -it bash (or powershell) let me run a new command in a running container -it opens an interactive shell
+
+ docker build -t $IMAGE_NAME:$IMAGE_TAG -f roman_blog/Dockerfile roman_blog
+ docker push $IMAGE_NAME:$IMAGE_TAG 
+
+ For creating volumes
+
+ Step one: create the volume
+ docker volume create myVol
+ docker volume inspect myVol
+ docker volume ls 
+
+Step two: Run the volume
+docker run -d --name [containername] -v myVol:/app [imagename]: [imagetag]
+Step three: Connect to the instance
+docker exec -it [containername] bash
+
+Creating a file in the volume using nano (i have to install this)
+
+app-get update
+app-get install nano
+cd app
+nano test.txt
+there I can write some text in
+to save strg o
+to leave strg x
+
+volumes can only be removed when the container is removed
+
+cat test.txt shows the content of the volume, the equivalent in powershell is type
+
+Steps I have done in the tmg-app for containerization with docker.
+I have build Dockerfiles, one for backend, one for frontend. 
+And then composed both by using a docker-compose.yml in the root of the project. The Dockerfiles I can generate in vs-code by add Dockerfile in the control panel and then following the steps. I copied then the created Dockerfile and dockerignore for having it also for the backend and then modified it. 
+
+Basic Example Frontend Dockerfile, but I used another way with copying all in an nging image(later more):
+FROM node:lts-alpine AS development
+ENV NODE_ENV=development
+WORKDIR /usr/src/app
+COPY ["package.json", "package-lock.json*", "npm-shrinkwrap.json*", "./"]
+RUN npm install --production && mv node_modules ../
+COPY . .
+EXPOSE 3000
+RUN chown -R node /usr/src/app
+USER node
+CMD ["npm", "start"]
+
+Backend Dockerfile:
+FROM node:lts-alpine
+
+# Set the environment to production
+ENV NODE_ENV=development
+
+# Set the working directory in the container
+WORKDIR /usr/src/app
+
+# Copy package.json and other related files
+COPY package.json package-lock.json tsconfig.json ./
+# RUN npm ci
+# Install dependencies including 'ts-node'
+# Ensure that 'ts-node' is listed in your package.json under 'dependencies' or 'devDependencies'
+RUN npm install
+RUN npm install ts-node --save-dev
+RUN npm install typescript --save-dev
+
+# Copy the rest of the application
+COPY . .
+# Compile TypeScript
+# RUN tsc
+
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Change ownership to non-root user for security
+RUN chown -R node /usr/src/app
+
+# Use non-root user to run the app
+USER node
+
+# Start the application
+CMD ["npm", "run", "server"]
+
+For the docker-compose.yml I have build a folder with the same name as my application. Because this is then taken as the containername. 
+Example:
+services:
+  backend:
+    build: 
+      context: ../backend
+      dockerfile: Dockerfile  
+    command: npm run server
+    # volumes:
+    #   - './:/usr/src/app'
+      # - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - MONGO_URL=mongodb+srv://${MONGO_USER}:${MONGO_PASSWORD}@cluster0.jthunsj.mongodb.net/
+    ports:
+      - "5000:5000"
+    # depends_on:
+    #   - mongo
+    networks:
+      - private
+      - public
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 1G 
+   mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: always
+    networks:
+      - private
+
+  frontend:
+    build:
+      context: ../frontend // path where the package.json lays
+      dockerfile: Dockerfile
+      target: development
+    networks:
+      - public
+    volumes:
+      - frontend_node_modules:/node_modules // volumes are persisted data
+    ports:
+      - "3000:3000" // port on which the app is running
+    depends_on:
+      - backend // will be started after the backend
+    deploy:
+        resources:
+          limits:
+            cpus: '0.70'
+            memory: 2G
+
+volumes:
+  # mongo_data:
+  #   driver: local
+  frontend_node_modules:
+    driver: local
+
+After building that I started out of the tmg-folder docker-compose up --build
+The images was created and I then tagged them both also out of the tmg-folder
+
+docker tag imagename myDockerusername/imagename: v1
+
+docker push myDockerusername/imagename: v1
+
+extrainfo docker compose commands:
+
+docker-compose start starts the container
+docker-compose stop stops the container
+docker-compose ps list the container
+docker-compose rm removes the container
+docker-compose down stops and removes !! careful
+docker-compose get the logs
+docker-compose exec [containername] exec -it bash
+
+
+Kubernetes
+
+As the images was builded I began with the kubernetes:
+
+At first I builded a folder tmg_kubernetes also in the root of the component.
+
+the first file I builded was a namespace.yml. Namespaces are for organizing the manifests. So I chosen the namespace dev for this. I can then create also a namespace for testing and production.
+
+Example:
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+
+Namespaces can also be set for teams, so that the work of the different teams not harms each other, because all deployments and services are set to this namespace and only react when you also type in the namespace. when we set no namespace it is "default". When we delete a namespace all pods and manifest are deleted with. Here is tricky, that e.g. when we use a cert-manager helm chart and there is any error, we delete the namespace when all other ingredients are already deleted, because otherwise that costs a lot of work.
+After creating the sevice and deployments. Also pods(most smallest storage unit in kubernetes) can be builded seperately by building an e.g. backend.yml and then setting kind to pod, but most of the time the pods are created by a deployment.yml. The service.yml I made seperately, but I can also set it directly into the deployment.yml by seperate them in column per --- . The service guarantees that the pods have an immutable ip address, because the ip adress of the pods is ephameral, so when they are lost and kubernetes directly build a new one this new one has a new ip adress. 
+A service.yml example:
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: tmg-app
+  namespace: dev
+spec:
+  selector:
+    app: tmg_app // for selecting the pods
+  ports:
+    - name: frontend
+      port: 80
+      targetPort: 3000
+    - name: backend
+      port: 81
+      targetPort: 5000 // is the containerPort in the deployment.yml
+and a possible deployment.yml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "8"
+  generation: 10
+  name: tmg-app
+  namespace: dev
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: tmg_app
+      env: prod
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2024-06-04T11:02:42+02:00"
+      labels:
+        app: tmg_app // with labels I define the selector for the service
+        env: prod
+    spec:
+      containers:
+        - name: backend
+          image: romanarmin/typescript_mern_graphql-backend:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "5000"
+            - name: MONGO_URL
+              valueFrom:
+                secretKeyRef:
+                  key: connectionStringStandardSrv
+                  name: my-atlas-connection
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 500m
+              memory: 300Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        - name: frontend
+          image: romanarmin/typescript_mern_graphql-frontend:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 800m
+              memory: 800Mi
+            requests:
+              cpu: 500m
+              memory: 300Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2024-06-05T08:53:52Z"
+    lastUpdateTime: "2024-06-05T08:53:52Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2024-06-05T08:44:22Z"
+    lastUpdateTime: "2024-06-05T08:53:52Z"
+    message: ReplicaSet "tmg-app-894cdf9b6" is progressing.
+    reason: ReplicaSetUpdated
+    status: "True"
+    type: Progressing
+  observedGeneration: 10
+  readyReplicas: 1
+  replicas: 3
+  unavailableReplicas: 2
+  updatedReplicas: 2
+we start such .yml by using kubectl apply -f nameOfTheyml.yml. Here is the order important, we must pay attention what depends on what.
+Example:
+1. Namespace
+2. Service
+3. Secrets, when the deployment needs it
+4. Deploymen
+
+After building the deployment, I can see my pods by using the command: kubectl describe pods -n dev or kubectl describe pods -o wide -n dev for having more information. 
+
+The structure of a deployment is
+    cluster
+      - nodepools of nodes or
+          - node
+              - deployment
+                  - replicaset
+                      - pods
+                      - kube-Proxy
+                      - kubelet
+                      - containerruntime
+  Creating a deployment it creates autmatically a replicaset with identical pods. The deployments are running containers based on there image that should has a version number so that we can build multiple versions of images and whe we change the version, we have only to set the version we want to se in the deployment and apply it new. Then the risk, that no version is available and the app is not reachable is lower.(Blue-Green deployment)  Using this method we have to watch the cluster size, for having an overview that the app not crashes in the moment the version is changed. 
+  A pod can held two containers one with the needed files and also it can be therein a helpercontainer or sidecar. That could be for example Prometheus or Jaeger. All containers within a pod share the same IP adress, Ipc and mounted Volumes. The containers communicate over localhost or Ipc (Inter process communication). Deploying a pod can be successfull or not (atomic operation) If it fails it is replaced by a new one, so I use a service for guaranteeing a constant ip adress. We scaling by adding more pods not by setting more containers in a pod and we replace it with a new version and not updates it
+
+  Kubernetes api
+
+ Master node sometimes also called control-plane
+ In the master node runs no container, its the only one who can write into a database and it is made like this:
+
+  kube-controller-manager <-- check the cloud provider if a node is deleted and sets up Router in the underlaying cloud infrastructure. creates, deletes and updates load balancers, create attaches and mounts volumes and orchestrate them
+
+  cloud-controller-manager
+
+  kube - apiServer <-- rest interface that stores data in etcd all others communicate with this one
+  |
+  | kubeScheduler <-- looks at all new pods and set them on a node to run if they are not assigned
+  V
+  etcd <-- datastore key value
+
+  to communicate with the apiserver we can use the imperative way, but I think the better one is the declarative way with yml files, but using helm charts it is sometimes more sensful to use the impreative way. Helm is the package manager for kubernetes. One resource for getting a good handling is artifact-hub what helped me later in my portfolioapp project.
+
+  Yaml required parameters
+  apiVersion
+  kind
+  metadata
+    name
+    namespace
+spec
+ - specifications
+
+Kubernetes context
+
+the context in kubernetes is an object with a group of credentials and contains the cluster in this project kubectl cluster-info gives back the docker cluster, the user and a namespace. All kubectl commands run against this current cluster. Informations about the cluster I can generate with kubectl cluster-info or kubectl config current-cluster 
+
+kubectl config get-contexts list all contexts
+
+kubectl config use-context [contextname or id] set the current
+kubectl config delete-context [contextname or id] delete the context
+kubectl config rename-context [oldcontextname] [newName]  rename the context
+
+
+Zu nodes:
+ Physical or virtual machines
+
+ The kubelet in nodes manganages the pods lifecycle and guarantees that the container in the pod is running and healthy. Kube-proxy is a network proxy that manages the network rules. The Containerruntime bundles all files.
+
+ Pod lifecycle
+
+ Creating a pod the CLI sends an information to the api-server which stores this in the etcd. The scheduler looks at the pods and the nodes and writes this information in etcd. The kubelet then looks at this information and writes a command to this before issuing a containerruntime. After that the status is again written in etcd, which is the single data resource in the cluster.
+ It makes sense to have everytime a odd number of nodes in the cluster because etcd needs always a majority decision for making changes. A cluster should not contains more then seven nodes.
+
+ Pod deletion
+ Adding a kubectl delete podnameOrId -n <namespacename>, this command is send to the api server and this gives the information to etcd, which is setting then a grace period default 30s. In this time some actions are suspended. The kubectl sees the information and sends a terminate command to the containerruntime and this stores the final status in etcd.
+
+ Pod states
+  pending
+  running
+  failed
+  succeded
+  unknown
+  crashLoopBackOff crashes and starts ever again - I think mostly we have here to add a node or take a bigger one
+
+  Each container must complete before the next starts. If it fails kubelet will restart it until it succeeds.
+    multi Container pods
+
+   Pattern Ambassador
+   pod
+     - app need to persist the data to database connected to
+     - ambassador knows how to write in a database
+   pod
+     - app writes compex monitoring output
+     -sidecar simplifys the monitoring for the output
+
+     Structure
+      apiVersion:v1
+      kind:pod
+      metadata:
+        name: twoContainers
+        label: whatever
+    spec
+      restartPolicy: always
+      containers:
+        - name: container_1
+          image: soandso
+          resources:
+            requests:
+              cpu:
+              memory:
+            limits:
+              cpu:
+              memory:
+          ports:
+            -containerPort: 80
+        - name: container_2
+          command:
+            - sleep
+            - '3600'
+
+    connection to the multiContainerPod: kubectl exec -it container_1 container_2 --/bin/share
+
+     In other way as containers pods cannot communicate with each other per localhost. They must have a loadbalancer 
+
+  Testing the lifecycle
+    ExecAction: Command execution check, if the command’s exit status is 0, it is considered a success.
+TCPSocketAction: TCP check to determine if the port is open, if open, it is considered a success.
+HTTPGetAction: HTTP check to determine if the status code is equal to or above 200 and below 400.
+The probes are executed in this order and also to write in this order
+   startuProbe 
+   tests if the container is started or in the tcp probe if the port is open and in the httpProbe it sends a get request for testing
+    readinessProbe 
+   Tests if the container is ready to get traffic, when this is rejected it stops the app from receiving traffic.
+   livenessProbe 
+     Indicates wether the code is running or not, by executing a command in the container. A failing livenessProbe will start the containers
+  
+   The probes also goes into the container.spec in myPod.yml or directly in the deployment.yml and are different in the way they test, based on which possibility I have to make kubernetes understand that my container is healthy. So for every probeType there are three possibilities Exec, HTTP and TCP and I not must take every of them, but instead I choose the right one for my purpose. So assuming I have a mern-stack where I not can test directly the execution therfore would might be the http-test the right one, because it sends an http-get request on a defined endpoint in my application:
+
+   Exec StartupProbe:
+   startupProbe:
+  initialDelaySeconds: 1 <-- wait one second and then run
+  periodSeconds: 5 <-- how often a probe should run, default is 10
+  timeoutSeconds: 1
+  successThreshold: 1 <-- required number of successfull probes to mark the container as healthy
+  failureThreshold: 1 <-- number of failing tests the container should be markesd as unhealthy
+  exec:
+    command:
+      - cat
+      - /etc/nginx/nginx.conf
+
+    TCP StartupProbe:
+    startupProbe:
+  initialDelaySeconds: 1
+  periodSeconds: 5
+  timeoutSeconds: 1
+  successThreshold: 1
+  failureThreshold: 1
+  tcpSocket:
+    host:
+    port: 80
+
+    HTTP StartupProbe
+      startupProbe:
+        initialDelaySeconds: 1
+          periodSeconds: 2
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 1
+          httpGet:
+            host:
+            scheme: HTTP
+            path: /
+            httpHeaders:
+            - name: Host
+              value: myapplication1.com
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          
+    Exec ReadinessProbe:
+    readinessProbe:
+  initialDelaySeconds: 1
+  periodSeconds: 5
+  timeoutSeconds: 1
+  successThreshold: 1
+  failureThreshold: 1
+  exec:
+    command:
+      - cat
+      - /etc/nginx/nginx.conf
+    
+    TCP ReadinessProbe:
+     readinessProbe:
+  initialDelaySeconds: 1
+  periodSeconds: 5
+  timeoutSeconds: 1
+  successThreshold: 1
+  failureThreshold: 1
+  tcpSocket:
+    host:
+    port: 80
+
+    HTTP ReadinessProbe:
+     readinessProbe:
+          initialDelaySeconds: 1
+          periodSeconds: 2
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 1
+          httpGet:
+            host:
+            scheme: HTTP
+            path: /
+            httpHeaders:
+            - name: Host
+              value: myapplication1.com
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+        Exec LivenessProbe:
+         livenessProbe:
+          exec:
+            command:
+            - sh
+            - /tmp/status_check.sh
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+          HTTP LivenessProbe:
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 3
+
+          TCP LivenessProbe:
+            initialDelaySeconds: 15
+            livenessProbe: ~
+            periodSeconds: 20
+            port: 8080
+            tcpSocket: ~
+
+    example how a probe for my mern stack could look like:
+    apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-backend
+  template:
+    metadata:
+      labels:
+        app: my-backend
+    spec:
+      containers:
+      - name: nodejs
+        image: my-nodejs-image
+        ports:
+        - containerPort: 5000
+        readinessProbe:
+          httpGet:
+            path: /endpoint
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+example for config-map 
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: mongo-config
+# data:
+#   database_url: mongodb-service
+
+example for mongo-express
+# apiVersion: apps/v1 // for deployment with container
+# kind: Deployment
+# metadata:
+#   name: mongo-express-deployment
+# spec:
+#   selector:
+#     matchLabels:
+#       app: mongo-express
+#   template:
+#     metadata:
+#       labels:
+#         app: mongo-express
+#     spec:
+#       containers:  # This should be an array
+#       - name: mongo-express
+#         image: mongo-express
+#         resources:
+#           limits:
+#             memory: "300Mi"
+#             cpu: "500m"
+#         ports:
+#         - containerPort: 8081
+#         env: 
+#         - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+#           valueFrom:
+#             secretKeyRef: 
+#               name: mongodb-connect
+#               key: mongo-root-username
+#         - name: ME_CONFIG_MONGODB_ADMINPASSWORD 
+#           valueFrom:
+#             secretKeyRef: 
+#               name: mongodb-connect
+#               key: mongo-root-password
+#         - name: ME_CONFIG_MONGODB_SERVER
+#           valueFrom:
+#             configMapKeyRef: 
+#               name: mongo-config
+#               key: database_url
+example for mongo-deployment
+# apiVersion: apps/v1 // with container
+# kind: Deployment
+# metadata:
+#   name: mongodb-deployment
+# spec:
+#   selector:
+#     matchLabels:
+#       app: mongodb
+#   template:
+#     metadata:
+#       labels:
+#         app: mongodb
+#     spec:
+#       containers:
+#       - name: mongodb
+#         image: mongo
+#         resources:
+#           limits:
+#             memory: "300Mi"
+#             cpu: "500m"
+#         ports:
+#         - containerPort: 27017
+#         env: 
+#           - name: MONGO_INITDB_ROOT_USERNAME
+#             valueFrom:
+#               secretKeyRef: 
+#                 name: mongodb-connect
+#                 key: mongo-root-username
+#           - name: MONGO_INITDB_ROOT_PASSWORD
+#             valueFrom:
+#               secretKeyRef:
+#                 name: mongodb-connect
+#                 key: mongo-root-username
+# ---
+# apiVersion: v1 
+# kind: Service
+# metadata:
+#   name: mongodb-service
+# spec:
+#   selector:
+#     app: mongodb
+#   ports:
+#   - port: 27017
+#     targetPort: 27017
+
+
+services
+ Abstracts a logical set of pods and enables a loose coupling between dependent pods.
+ Default Type is clusterIP. 
+ setting clusterIp: none means it is a headless service, that is necessary in conclusion with stateful sets
+ we can use nodePort but this is unsafe better is to use type:loadBalancer how it is offered by the cloudProvider. However the nodePort would be accessible from inside and outside the cluster. This would look like:
+
+ ports
+   - nodePort: 32410 <-- the port is here static or dynamically set in a range between 30000 - 327674
+     protocol: TCP
+     port: 80
+     targetPort: 80
+When the port is not set, kubernetes generates a random one. The nodes nust have here a public IP adress. The type nodePort uses any NodeIp + nodePort to access the service
+The clusterIp is used for an internal connection to the pods. 
+ when we use a service type: clusterIP, the clusterIp is only reachable from internal, means from inside the cluster. So when my app should comunicate with outside the cluster I can use kubernetes ingress to generate a connection. The connection is defined in the deployment. by using the containerPort, thats why we can run portForward svc/tmg-app 3000:80 -n dev. The external port is here the containerPort 3000, which is defined in the deployment and portward from the internal port 80 what is the targetPort defined in the service for internal connection. The clusterIp describes loadBalancing in the way of round robin.
+
+ round robin means the requests will send in rotating order requests to the different servers, independent of how many connections already run on this server
+
+ How is this working: 
+   The nameserver has a list of Ip addresses for each domain. On each request to the DNS it provides another Ip adress. That leads to the fact that the incoming requests are evenly set on each available server.
+   The advantage is the equal workload on every server.
+   The disadvantage lays therein that this system not takes care how many workload is already running on this server.
+
+    type: loadBalancer
+    The loadBalancer is operation on the transport level (TCP) Transmission control Protocol that defines in which way data is transmitted in Network transmissons. It sits in front of the webserver and routes the incoming request to the available servers. Layer 4 Load Balancers operate on the transport layer of the OSI model stands for Open Systems Interconnection model that describes a networking system’s communication functions. The OSI model consists of 7 layers: Application Layer, Presentation Layer, Session Layer, Transport Layer, Network Layer, Datalink Layer, Physical Layer. Each of these layers has a different role to play, and they work collaboratively to transmit the data from one networking device to another. 
+    
+    Layers are a series of changes that build upon each other to form an image. Think of it like stacking transparent sheets where each sheet adds new details to the image below it. 
+    
+    When a client (such as a user’s web browser) sends a request to the application, the request is first received by the load balancer. The load balancer then uses a load-balancing algorithm to determine which of the web servers should receive the request. The algorithm considers factors such as the current workload of each server, the server’s capacity, and the type of request sent. Hence, placing the load balancer in this position allows it to distribute incoming traffic evenly among the web servers, which can improve the performance and availability of the application. It also allows the load balancer to provide other benefits, such as increased scalability and improved security. Layer 7 Load Balancers are able to decide based on the content, means the url, headers or specific keywords on which server the requests should run.
+
+Once the load balancer decides on the target server using a routing algorithm, it then forwards the request. The web server processes the request and sends back the response to the load balancer. Further, the load balancer forwards the response to the client. This process ensures that the web servers are not directly accessible to anyone. The Load Balancer is the only public endpoint to access web servers and secures our infrastructure:
+
+   In difference to round robin the loadBalancer is using a software or a hardware component for avoiding to high load on a certain server. The Load balance Algorythms can be the following:
+     a) Least Connection: Requests goes to the server with the lowest number of connections.
+     b) Weighted Least Connection: Requests are sended to the servers with the fewest connections in the relation to their weight. 
+     c) weighted response time controlls the time the server need to answer on the request
+     d) Resource based Considers the available re resources of a server at the time of the request
+     e) Ip-Nash or DNS based uses the DNS to provides different Ip adresses for the answers of the server querys
+
+     Storage and persistence
+
+    To store data outside of the container we are using volumes that stores the data in an external storage system.
+       There ar two ways to create storage
+    Static & dynamic 
+
+    Storage
+
+    cloud                           Plugin Layer                            Persistent Volume
+    storage                         CSI
+    provider                        Container Storage Interface             Storage class
+
+        <--------------------------------------------------------------------------
+
+        Static way
+
+        Persistent Volumes                                              Persistent Volumes Claims
+                PV                                                              PVC
+
+                both are kubernetes objects
+
+        Persistent Volumes represents a storage resources cluster wide provisioned by the administrator
+        A PVC does a one to one mapping to a persistent volume, one or more pods can use a PVC
+
+        PVC's are like I have understood plugins that are provisioned by the different Services:
+
+        GCE PersistentDisc
+        AWS Elastic Blockstore
+        Azure File
+        Azure Disk
+        CSI
+        FC (Fixture Channel)
+        Fles Volume
+        Flocker
+        NFS
+        ISCSI
+        RBD 
+        Ceph Fs 
+        Cinder
+        Glusterfs
+        VasphereVolume 
+        Quobyte Volumes
+        Postworks Volumes
+        ScaleOVolumes
+        Storage OS
+        Hostpath mostly for testing because it not works in a multinode cluster and not supports localstorage
+
+        use the Claim           Claim a portion of the storage class         Define a persistent volume
+
+          POD                            PVC                                    PV      ===========> cloud storage
+          volumeName:data                 name:www                              name:pv1
+          volumeClaimName:www             selector:pv1                          capacityStorage:10Gi
+          mountPath:/data                 requestStorage:1Gi                    using a driver for the storage device
+
+          Reclaimpolicies should be set to retain because default is delete
+          3 AccessModes ReadWriteMany, ReadOnlyMany, ReadWriteOnce the first pod will be able to write the others are readonly - certainly most used
+          so spec in the yml of PersistentVolume storageClassName: ssd, capacity: storage:1Gi, volumeNode:Filesystem accessModes:
+            - ReadWriteOnce
+          persistentVolumeReclaimPolicy:retain
+          hostPath:
+            path: "/data/"
+          Then in the persistenVolumeClaim the selector: matchLabels: type:local and in the pod that should get the data in spec: volumes: claimName: <nameOfThePVC>
+          The pvc must first be deleted when I want to delete a pv1
+
+          Dynamic way
+
+          Storage class
+
+          Describes the classes of storage offered by the administrator
+          No need to set a capacity
+          Eliminates the need for the admin to preProvision a persistent volume
+ 
+          Step 1:
+                Define a storage class that has access to the cloud Provider
+                kind:storageClass 
+                apiVersion:storage.k8s.io/v1
+                metadata:
+                  name:standard 
+                provisioner: kubernetes.io/azure-disk <-- the plugin for the external storage
+                parameters:
+                  storageaccountype: Standard_CRS <-- here the parameters of the provider
+                  kind: Managed
+
+          Step 2:
+                Define a PVC
+                spec: storageClassName: <nameOfTheStorageClass>
+          Step 3:
+          in the pod under spec containers
+          ports:
+            - containerPort: Number
+              name:"http-server"
+          volumeMounts:
+ Zu stateful sets
+  here it is better to take the cloud Provider database service, but they are like deployments only they set a persistent pod identifier
+
+  zu daemon sets
+   ensures that every nodes except the master node run a copy of a pod 
+
+   Job
+    parallel jobs: runs pods parallel when the data is large, run until a number of tasks have successfull completed
+    multiple parallel jobs: run multiple pods to handle large data
+    non parallel jobs: run a single task to completition
+  Kubernetes Jobs
+    Purpose: A Job creates one or more Pods and ensures that a specified number of them successfully terminate. Jobs are designed for tasks that need to run to completion.
+    Use Cases: Data processing, batch processing, and one-time tasks.
+    Example: Running a script to process a batch of data.
+    Kubernetes CronJobs
+    Purpose: A CronJob creates Jobs on a repeating schedule. It’s similar to the cron utility in Unix-like systems.
+    Use Cases: Regularly scheduled tasks like backups, report generation, and maintenance tasks.
+    Example: Running a backup script every day at midnight.
+    Key Differences
+    Scheduling:
+    Job: Runs immediately when created.
+    CronJob: Runs at specified times, dates, or intervals.
+    Repetition:
+    Job: Runs once.
+    CronJob: Runs repeatedly according to the schedule.
+    Example for Jobs:
+    Kubernetes Jobs
+      Purpose: A Job creates one or more Pods and ensures that a specified number of them successfully terminate. Jobs are designed for tasks that need to run to completion.
+      Use Cases: Data processing, batch processing, and one-time tasks.
+      Example: Running a script to process a batch of data.
+      Kubernetes CronJobs
+      Purpose: A CronJob creates Jobs on a repeating schedule. It’s similar to the cron utility in Unix-like systems.
+      Use Cases: Regularly scheduled tasks like backups, report generation, and maintenance tasks.
+      Example: Running a backup script every day at midnight.
+      Key Differences
+      Scheduling:
+      Job: Runs immediately when created.
+      CronJob: Runs at specified times, dates, or intervals.
+      Repetition:
+      Job: Runs once.
+      CronJob: Runs repeatedly according to the schedule.
+    
+    Kubernetes Cron Jobs
+    apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: example-cronjob
+    spec:
+      schedule: "0 0 * * *"  # Runs every day at midnight
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: example
+                image: busybox
+                command: ["echo", "Hello, Kubernetes!"]
+              restartPolicy: OnFailure
+
+    Scaling
+      I have the possibility to scale the number of my pods up and down. And also the value of cpu and memory the application uses. 
+
+      Virtual Scaling Auto
+        The application might need at one time or and the other time less cpu's and memory. So my interest is to scale them up and down, based on the needs of my application. It should not be used together with Horizontal Pod Autoscaling
+        Here is especially to look on the resourcePolicy field:
+        example:
+        updatePolicy: auto 
+        resourcePolicies:
+          - containerName:
+            minAllowed:
+              cpu:1m
+              memory:1Mi
+            maxAllowed:
+              cpu:1
+              memory:1Gi
+            controlledResources: ['cpu', 'memory']
+
+      Horizontal Pod Auto scaling:
+        Uses the K8s Metric server
+        Pods must have requests and limits defined
+        The HPA checks the Metric server every 30s and scale according to the min and max replicas I have defined
+        So it adds and removes replicasets
+        Cooldown/delay 
+         Prevent racing conditions
+         Once a change is made HPA waits 
+         By default the delay on scale down events is 5 minutes.
+
+         example for an hpa.yml
+           apiVersion: autoScaling/vbeta2
+           kind: HorizontalPodAutoScaler
+           metadata:
+             name: whatever
+             namespace: dev
+          spec:
+            scaleTargetRef:
+              apiVersion: apps/v1
+              kind:Deployment
+              name: tmg-app
+              minReplicas:1
+              maxReplicas:10
+              metrics:
+                - type: Resource
+                  resource:
+                    name:cpu
+                    target:
+                      type: Utilization
+                      averageUtilization:50 <-- if the averageUtilization is over 50 % the Utilization should kick in
+                      instead of targetFields we can set
+                    targetCPUUtilizationPercentage:50
+                      Is the metrics server installed in my cluster?
+
+                      kubectl get pods -n kube-system
+
+                Install the metrics: Go to kubernetes-sign/metrics-server
+                klick on apply, search the field deployment und add in the args - --kubelet-insecucre-tls
+
+        ingress
+          with ingress we assure that our applicarion is reachable from outside and have a readable url.
+
+          apiVersion: v1
+          kind:ingress
+          metadata:
+            name:myApp-ingress
+          spec:
+            rules:
+              - host: myapp.com <-- wished url, so when this is called by the user ingress maps to the internal-service
+                http: <== Incoming request is forwarded to the internal-service
+                  paths:
+                    - backend:
+                        serviceName: myApp-internal-service
+                        servicePort:8080
+        so in the internal-service
+          apiVersion:v1
+          kind:service
+          metadata:
+            name: myApp-internal-service <-- name of the service out of the ingress
+          spec:
+            selector:
+              app: myApp
+            ports:
+              - protocol: TCP
+                port: 8080 <--ineternal port also servicePort aus der ingress
+                targetPort:8080
+
+        for using ingress we need a ingress-controller to be installed and this controller manages the redirections of incoming requests, its evaluates all the rules and is the entrypoint to the cluster. The ingress controller comes from a third party library. K8s Nginx Ingress Controller is an kubernetes internal one, but there are a lot of others: https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/ or for bare metal: https://kubernetes.github.io/ingress-nginx/deploy/baremetal/
+        
+        install k8s Nginx Ingress controller
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+        helm install my-nginx ingress-nginx/ingress-nginx
+        after testing the app helm uninstall my-nginx
+        in minikue I can easily install a ingress controller by using minkube addons enable ingress then I have the ingress-controller as pod in the kube-system, the informations come from the kubernetes-dashboard namespace
+        the ingress would then look like this:
+
+        apiVersion:v1
+        kind:ingress
+        metadata:
+          name:dashboard-ingress
+          namespace: kubernetes-dashboard
+        spec:
+          rules:
+            - host: dashboard.com # also I can define here multiple hosts with the path they should open
+              http:
+                paths:
+                # here I can define a path:  - path: /whatEverPath and repeating this I have multiple subdomains
+                  - backend
+                      serviceName: kubernetes-dashboard <-- this information iget out of the pods in the -n kubernetes-dashboard
+                      servicePort:80
+      After I applied the ingress.yml I get the ingress: kubectl get ingress -n kubernetes-dashboard --watch there I get the adress, then sudo vim etc/hosts then enter the password away and I can set this adress at the end of this opening host and set this to the hostname, then whenever the hostname is called it redirects to this adress
+
+   usage for https
+     I set here in the ingress.spec about the rules section
+     tls:
+       - hosts:
+         - myApp.com
+           secretName: mySecretName-tls and in the secret.data i define tls.crt and tls.key by using base64 there I use the file content
+           and then a secret.type named kubernetes.io/tls
+
+          opensssl for generating key and certificate
+
+          openssl genrsa -out tls.key 2048
+          Create a Certificate Signing Request (CSR):
+                        [ req ]
+              default_bits = 2048
+              prompt = no
+              default_md = sha256
+              req_extensions = req_ext
+              distinguished_name = dn
+
+              [ dn ]
+              C = Country
+              ST = State
+              L = City
+              O = Organization
+              OU = Organizational Unit
+              CN = myApp.com
+
+              [ req_ext ]
+              subjectAltName = @alt_names
+
+              [ alt_names ]
+              DNS.1 = myApp.com
+              DNS.2 = www.myApp.com
+
+              genarate the CSR:
+              openssl req -new -key tls.key -out tls.csr -config csr.conf
+
+              Generate the TLS Certificate: Sign the CSR with your private key to create the certificate (tls.crt). You can self-sign it or have it signed by a Certificate Authority (CA). For self-signing:
+
+              openssl x509 -req -in tls.csr -signkey tls.key -out tls.crt -days 365
+            See where I set this
+    AKS reduces the complexity and operational overhead of managing Kubernetes by shifting that responsibility to Azure. When you create an AKS cluster, Azure automatically creates and configures a control plane for you at no cost. The Azure platform manages the AKS control plane, which is responsible for the Kubernetes objects and worker nodes that you deploy to run your applications. Azure takes care of critical operations like health monitoring and maintenance, and you only pay for the AKS nodes that run your applications. When you create an AKS cluster, the Azure platform automatically creates and configures its associated control plane. This single-tenant control plane is provided at no cost as a managed Azure resource abstracted from the user. You only pay for the nodes attached to the AKS cluster. The control plane and its resources reside only in the region where you created the cluster.
+
+    Nodes
+To run your applications and supporting services, you need a Kubernetes node. Each AKS cluster has at least one node, an Azure virtual machine (VM) that runs the Kubernetes node components, and container runtime.
+
+Nodes include the following core Kubernetes components:
+
+Component	Description
+kubelet	The Kubernetes agent that processes the orchestration requests from the control plane along with scheduling and running the requested containers.
+kube-proxy	The proxy handles virtual networking on each node, routing network traffic and managing IP addressing for services and pods.
+container runtime	The container runtime allows containerized applications to run and interact with other resources, such as the virtual network or storage. it is software that executes containers and manages container images on a node
+
+From my experiences out of the portfolio-project
+
+Portfolio-Docker
+
+The first point to matter is, that I had to build the Dockerfile for the backend in the root of the project, because there also my package.json for the backend relies. I built then the docker-compose.yml and defined there the mongo_connection. After that I made up th gitlab-ci.yml for the pipeline. The build stage was no problem, I had to enter my docker credentials and the rest was the same commands I usually take to build containers and push them into docker.
+
+Portfolio-Kubernetes
+
+I set the kubernetes manifests in a folder in the root of the project. First I defined the namespace prod, target the pods for this namespace in a service.yml and then created the pods in the deployment.yml, For the mongo-connection I also defined in the deployment I created a secret with the mongoconnection as base64 string:
+
+In windows
+$encoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("mongo-connection-string"))
+type $encoded - gives out the base64 string, this output I set in the secret as value of data.connectionStringStandardSrv
+to decode:
+$decoded = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))
+type $decoded - gives out the decoded base64 string
+
+In linux 
+echo -n "mongo-connection-string" | base64
+-gives back the base64 string for the connection 
+to decode
+echo -n "bW9uZ28tY29ubmVjdGlvbi1zdHJpbmc=" | base64 -d
+
+The same for linux 
+
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt
+
+base64 tls.crt > tls.crt.base64
+base64 tls.key > tls.key.base64
+
+base64 -d tls.crt.base64 > tls.crt
+base64 -d tls.key.base64 > tls.key
+
+using flux
+choco install flux / brew install flux
+code $PROFILE - opens PROFILE
+
+flux completion powershell | Out-String | Invoke-Expression
+
+After this I generate myself an accestoken on my profile on gitlab.
+
+Iset this token on my local machine:
+Linux
+export GITLAB_TOKEN
+or on windows
+setx GITLAB_TOKEN "glpat-theTokenFromTheUi"
+
+flux bootstrap gitlab 
+--hostname=gitlab.com
+ --owner=romanarmin
+ --repository=flux_config
+ --branch=master 
+ --path=./portfolioApp/portfolio_kubernetes
+ --deploy-token-auth 
+
+  if I have several custers I can let run kubectx clustername and then run the flux bootstrap command, this should set me a single flux on every cluster, I only must set then single repositories for each cluster with the concluding path, so I define for every cluster an own directory.
+
+  I asked that also chat-gpt:
+  To setup flux for multiple clusters, I would set a directory for each stage, then with kubectx  clustername I have only this cluster in the directory, for every cluster I have then a context only in this directory and when I then use the flux bootstrap command in this context with the correct path to the directory and set also up for everyone a repo for the flux manifests, then I have clear seperated, clusters, contexts and flux repos for every stage of the development and deploying process? And so I can do also with the gitlab-agent or would one gitlab-agent be enough in this situation?
+
+  Her answer:
+  Yes, your understanding of setting up Flux for multiple clusters is correct. Here’s a summary of your process:
+
+You create a separate directory for each stage (e.g., development, testing, production).
+You use kubectx clustername to switch to the context of each cluster.
+In each context, you run the flux bootstrap command with the correct path to the directory for that stage.
+You set up a separate Git repository for the Flux manifests for each stage.
+This approach gives you clear separation of clusters, contexts, and Flux repositories for each stage of the development and deployment process.
+
+As for the GitLab agent, it depends on your specific use case. If you want to have separate configurations, permissions, or behaviors for each stage, then it would be beneficial to set up a separate GitLab agent for each stage. However, if the configuration and behavior of the GitLab agent would be the same across all stages, then one GitLab agent might be enough.
+
+Remember, the key is to ensure isolation between different stages of your deployment pipeline to prevent accidental changes or leaks from one stage to another. This is especially important when dealing with sensitive data or critical applications.
+
+
+  After I setup flux I must again upgrade the helm install of the gitlab-agent, so that they are connected
+
+  For checking everything is correct for flux I use:
+  flux check
+  or flux view
+
+  So when everything is running, it is time to create the deploy stage on gitlab-ci.yml. Here an example what must be in there:  
+  stages:
+  - build
+  - test
+  - deploy
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying to DigitalOcean..."
+    - apt-get update && apt-get install -y doctl
+    - doctl auth init --access-token $DO_API_TOKEN
+    - doctl kubernetes cluster kubeconfig save <clusterid>
+    - kubectl apply -f k8s-manifests/
+    - kubectl rollout status deployment/my-deployment
+  only:
+    - master
+
+
+  After this I start to work with Digital-Ocean and create a droplet for the deployment.
+
+  I created a ssh-key with ssh -keygen and set this key into the settings of my project under the point security.
+   mkdir .ssh in User and then ssh-keygen -t rsa -b 4096 -f C:\Users\User\.ssh\digital_ocean_key
+type C:\Users\User\.ssh\digital_ocean_key.pub I have setted the output on digital-ocean settings
+ssh root@IpAdressOfTheDroplet
+Then I create a digital-ocean-cluster on ther ui. For this I generate also on the ui an accessToken and connect:
+choco install doctl
+after installing doctl, I have to run this, I must have the doctl app in my programmfiles doctl direction
+doctl auth init --context roman-digitalocean-portfolio-cluster
+when its not current - doctl auth switch --context roman-digitalocean-portfolio-cluster 
+digital-ocean-access-token
+dop_v1_the_token I generated on digital-ocean ui
+doctl account get - gives back my account
+doctl compute image list - lists all available images
+doctl compute droplet list - lists all available droplets
+list ssh key
+doctl compute ssh-key list
+first config kubectl to connect from my local machine with the digital ocean cluster
+doctl kubernetes cluster list
+
+doctl kubernetes cluster kubeconfig save <clusterid>
+
+Verify my kubectl connection: 
+kubectl config get-contexts
+to install docker I enter docker and then apt update 
+and apt install docker.io
+
+after doing this I can then apply all manifests and the flux and gitlab-agent on this context.
+
+Gitlab-agent
+For Gitlab-Agent I go on the gitlab ui and 
+On the left sidebar, select Search or go to and find your project. If you have an agent configuration file, it must be in this project. Your cluster manifest files should also be in this project.
+Select Operate > Kubernetes clusters.
+Select Connect a cluster (agent).
+If you want to create a configuration with CI/CD defaults, type a name.
+If you already have an agent configuration file, select it from the list.
+Select Register an agent.
+I get then all data I need to connect the gitlab-agent
+Afterwards I create a file with the path .gitlab\agents\portfolioapp\config.yml
+gitops:
+  manifest_projects:
+    - id: 'romanarmin1/portfolioapp/' # must be the path on gitlab
+      paths:
+      - glob: '/**/*.{yaml,yml}'
+
+I create a serviceaccount.yaml and a serviceaccount-token.yaml for defining which access the gitlab-agent should have for the project. Default would be it has admin rights.
+I grep the token, the agent-id and the url from gitlab and then use this helm-command
+agent_id: 1104307
+kas_url:  wss://kas.gitlab.com
+helm repo add gitlab https://charts.gitlab.io
+helm repo update
+  helm upgrade --install portfolioagent gitlab/gitlab-agent 
+  --namespace gitlab-agent-portfolioagent //mynamespace
+  --create-namespace 
+  --set serviceAccount.create=false //should not create default
+  --set serviceAccount.name=my-serviceaccount //should take my sericeaccount
+  --set rbac.useExistingRole=adminRole //should take the Role I have defined there
+  --set rbac.create=false // should not create his own one
+  --set image.tag=v17.2.0-rc1 //image I get from gitlab
+  --set config.token=glagent- //token I get from gitlab
+  --set config.kasAddress=wss://kas.gitlab.com 
+  --set config.gitlabUrl=https://gitlab.com./
+  --set-file config.kasCaCert=tls.crt // tls.crt can be the one I create with openssl
+
+Ikeys and ingress
+I installed now the repo taking artifactHub
+
+Then created a nginx-values.yml
+with: controller:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 90Mi
+  and created the namespace ingress-nginx
+helm install [RELEASE_NAME] ingress-nginx/ingress-nginx, also
+
+helm install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx -f nginx-values.yml
+
+check when something fails:
+kubectl exec -it portfolioapp-676dd9d8d5-7tvxn -c frontend -n prod -- netstat -tuln
+so I set targetPort 80 for frontend in deployment and service, that solved the error
+For having frontend and backend available I setup a new A record only typing api and then the loadBalancerIp adress and tsetup the host for frontend and backend seperately. Thats best practice, look at ingress.
+
+cert manager
+again from artifacthub I get the resources, that is the kubectl apply command
+then installed the repo jetstack and updated it
+I created a namespace cert-manager
+then created a cert-manager-values.yml with:
+#like shown for crds
+installCRDs: fALSE
+
+#prometheus not yet 
+prometheus:
+  enabled: false
+then I installed cert-manager, be aware that is the same version where the resources come from
+helm install cert-manager --namespace cert-manager --version v1.15.2 jetstack/cert-manager -f cert-manager-values.yaml
+then created the issuer.yml and decided to take a clusterIssuer, but then the secret is in the cert-manager namespace, but it should be in the prod namespace. To copy it in windows:
+kubectl get secret letsencrypt-nginx-private-key -n cert-manager -o yaml | 
+    ForEach-Object { $_ -replace 'namespace: cert-manager', 'namespace: prod' } | 
+    kubectl apply -f -
+in linux:
+kubectl get secret letsencrypt-nginx-private-key -n cert-manager -o yaml | sed 's/namespace: cert-manager/namespace: prod/' | kubectl apply -f -
+then I apply the ingress.yml and the certificates was created
+
+what we have to do is to enable the proxy protocol, so I uncommented the annotations like is to see in nginx-values.yml and also there the config
+After that I have to upgrade the helm of ingress-nginx
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx -f nginx-values.yml
+
+
+Register the Domain:
+
+I need to register the domain with a domain registrar. Some popular domain registrars include GoDaddy, Namecheap, and Google Domains, what is now squarespace.During the registration process, I buyed the domain on godaddy.
+Update Name Servers:
+
+Once my domain is registered, I need to update the domain's name servers to point to DigitalOcean's name servers. This can be done under the point DNS in my godaddy account. The name servers for DigitalOcean are:
+ns1.digitalocean.com
+ns2.digitalocean.com
+ns3.digitalocean.com
+
+Verify DNS Records:
+After updating the name servers, it may take some time (up to 24-48 hours) for the changes to propagate, my domain was immedeatly accessible. I can use tools like DNS Checker to monitor the propagation status.
+
+  Kubernetes build in roles for serviceaccounts:
+  to see what permissions are built-in, example 
+kubectl describe clusterrole edit
+Roles
+admin: Allows admin access. Intended to be granted within a namespace.
+edit: Allows read/write access to most objects in a namespace.
+view: Allows read-only access to see most objects in a namespace.
+ClusterRoles
+cluster-admin: Allows super-user access to perform any action on any resource.
+admin: Allows admin access, intended to be granted within a namespace using a RoleBinding.
+edit: Allows read/write access to most objects in a namespace.
+view: Allows read-only access to see most objects in a namespace.
+
+To use it I don't need to build a clusterRole, but only I bind them, examples:
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitlab-ci-rolebinding
+  namespace: prod
+subjects:
+- kind: ServiceAccount
+  name: gitlab-ci-serviceaccount
+  namespace: prod
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+
+  apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gitlab-ci-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: gitlab-ci-serviceaccount
+  namespace: prod
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+
+
+/////////////////////////////////////////////////////////////////////////
+  Usage of github-actions for ci-cd:
+  mkdir -p .github/workflows
+cd .github/workflows
+add yaml file
+Example content of the yaml file:
+yaml
+name: Animal Farm NodeJS CI //set a desriptive name
+on: //here we define when our workflow runs
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs: //jobs like in gitlab
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2 //checks out the current repository. In any job, you’ll usually need to do this as the first step, or at least one of the first steps, that obviously checks out an artifact on github
+    - name: Use Node.js
+      uses: actions/setup-node@v1 //install node
+      with:
+        node-version: '18.x' //current node version
+    - name: Run Yarn 
+      run: yarn
+    - name: Run tests
+      run: yarn test
+
+      then for Docker I create a second workflow in the .github/workflows a docker.yaml, example:
+      yaml
+name: Publish Docker image
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHRC_TOKEN }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: . //where I have my dockerfile
+          file: ./Dockerfile
+          push: true
+          tags: |
+            jamtur01/animal-farm-nodejs:latest //latest we never take, take the version
+            ghcr.io/jamtur01/animal-farm-nodejs:latest
+Now I asked chat gpt how my gitlab-ci.yml woul look in the github-actions ci/cd, here is what she suggested
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build_image:
+    runs-on: ubuntu-latest //mandatory
+    services:
+      docker:
+        image: docker:19.03.12
+        options: --privileged
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2 //checks the code of the repo
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push frontend image
+        run: |
+          docker build -t ${{ secrets.IMAGE_NAME_FRONTEND }}:v1 ./frontend
+          docker push ${{ secrets.IMAGE_NAME_FRONTEND }}:v1
+
+      - name: Build and push backend image
+        run: |
+          docker build -t ${{ secrets.IMAGE_NAME_BACKEND }}:v1 .
+          docker push ${{ secrets.IMAGE_NAME_BACKEND }}:v1
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build_image
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v1
+        with:
+          version: 'v1.18.0'
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f portfolio_kubernetes/namespace.yml
+          kubectl apply -f portfolio_kubernetes/service.yml
+          kubectl apply -f portfolio_kubernetes/secret.yml
+          kubectl apply -f portfolio_kubernetes/serviceaccount.yml
+          kubectl apply -f portfolio_kubernetes/my-serviceaccount-token.yml
+          kubectl apply -f portfolio_kubernetes/deployment.yml
+          kubectl apply -f portfolio_kubernetes/ingress.yml
+          kubectl rollout status deployment/portfolioapp -n prod
+So the difference is gitlab uses one gitlab-ci.yml to define the pipeline, github takes multiple workflows for ci/cd. We defining when our pipeline should run in the on section. The used steps are provided from the github community and I can find them in the github action marketplace or on th cloud provider. GitHub Actions: Secrets are managed through GitHub’s repository settings and accessed using ${{ secrets.SECRET_NAME }}, GitHub Actions: Jobs are defined within workflows and can run in parallel or sequentially using the needs keyword.
+
+Generally 
+
+Events__triggers__>Worflow___uses___>Action
+
+The steps are:
+Listen Events 
+
+Using pre-existing actions
+
+Or run shell scripts.
+Docker runs only on linux, using docker on windows is not supported.
+
+instead of stages, we take needs, so
+needs: [jobname]
+
+Troubleshoot
+For vs-code there is a debugging extension
+And I can run:
+Enable Debug Logging:
+If the workflow logs do not provide enough detail, you can enable additional debug logging by setting the ACTIONS_RUNNER_DEBUG secret to true in your repository settings.
+ACTION_STEP_DEBUG
+ACTION_RUNNER_DEBUG
+
+Workflow editor I find this under github actions, then I choose a workflow or build a custom one, only click on the job that should be logged.
+Rerun-job button to start it new
+Use SSH for Debugging:
+You can use tools like tmate to get SSH access to the runner for real-time debugging. This can be particularly useful for complex issues.
+
+nectos/act, to find on github actions allows me to run a specific job on my local machine
+
+github super-linter is a general linter for the most of programminng languages
+
+
+Deploying Steps
+
+Store the image in github
+Dynamically built a task Definition
+Configure Cloud Provider credentials
+Deploy using a task Definition
+Uses private Registry Authentication
+Requires proper execution
+For deploying we can have in the build job e.g.
+uses: actions/upload-artifact@master
+with: 
+  name: webpack artifacts
+  path: public/
+
+then in the deploy job
+
+steps:
+  - uses: actions/checkout@v1
+  - name: Download built artifact
+    uses: actions/upload-artifact@master
+    with:
+      name: webpack artifacts
+      path: public //when I not specify a path, it is set in the root directory
+
+
+Next to hosted runners we can use self hosting runners:
+Download and extract the scripts
+You need to download the GitHub Actions runner application to your machine. This application will allow your machine to communicate with GitHub and execute the jobs defined in your workflows.
+Configure the runner with the token
+After downloading the runner application, you need to configure it using a registration token. This token is generated by GitHub and is used to authenticate your runner with your GitHub repository or organization.
+Start listening for jobs
+Once configured, you start the runner application. It will then listen for jobs from GitHub Actions and execute them on your self-hosted runner.
+Steps to Set Up a Self-Hosted Runner
+Navigate to Your Repository Settings:
+Go to your GitHub repository.
+Click on the “Settings” tab.
+In the left sidebar, click on “Actions” and then “Runners”.
+Add a New Runner:
+Click on the “New self-hosted runner” button.
+Select the operating system and architecture of your runner machine.
+Follow the instructions to download, configure, and start the runner.
+Run the Commands:
+Open a terminal on your runner machine.
+Run the provided shell commands to download, configure, and start the runner.
+
+We can group self hosted runners 
+
+by
+create an organization level
+
+Scope to specific organization or repositories
+Move runners between groups.
+A runner can only be in one group at the same time
+
+Create a dedicated user for the runner
+Enable limited sudo
+Multiple tools with specific tools
+
+Sel hosted runner are risky
+
+Github secrets
+GITUB_TOKEN is automatically available
+is called with secrets.<name>
+we can use it with the github CLI
+
+it has limitations
+are not read in the code
+we cannot have more then 100 secrets with a max of 64K
+we can use it with an API 
+
+
+Gulp -look at the ready gulp project
+a build pipeline tool, automates the workflow
+
+npm install --global gulp-cli
+then in the project
+npm install gulp --save-dev, and then the other needed packages
+gulp-rename 
+gulp-sass — compiles your Sass files into CSS
+gulp-cssnano — minifies your CSS files
+gulp-concat — concatenates (combines) multiple JavaScript files into one large file
+gulp-uglify — minifies your JavaScript files
+
+create gulpfile.ts or .js in the root of the component
+in the gulpfile we create our tasks
+the commadline command is gulp for one task or gulp <taskname1> <taskname2> //taskname = functionname s. b.
+the tasks could be for example: src(), dest(), series(), or parallel()
+Each task can be split into its own file, then imported into your gulpfile for composition. Not only does this keep things organized, but it allows you to test each task independently or vary composition based on conditions.
+Each gulp task is an asynchronous JavaScript function - a function that accepts an error-first callback or returns a stream, promise, event emitter, child process, or observable 
+public Files are exported from the gulp file, so they run with the gulp command in the terminal, the others are private, so that the user not can execute them independently. They are used for internal usage like series() or parallel()
+example: 
+const { series } = require('gulp');
+
+// The `clean` function is not exported so it can be considered a private task.
+// It can still be used within the `series()` composition. 
+
+function clean(cb) { // clean function should only run one time before all others
+  // body omitted
+  cb();
+}
+
+// The `build` function is exported so it is public and can be run with the `gulp` command.
+// It can also be used within the `series()` composition. 
+function build(cb) {
+  // body omitted
+  cb();
+}
+
+exports.build = build;
+exports.default = series(clean, build); // to export is the primary registration
+
+const { series } = require('gulp');
+
+function transpile(cb) {
+  // body omitted
+  cb();
+}
+
+function bundle(cb) {
+  // body omitted
+  cb();
+}
+
+exports.build = series(transpile, bundle); or with nested parallel
+
+exports.build = series(
+  clean,
+  parallel(
+    cssTranspile,
+    series(jsTranspile, jsBundle)
+  ),
+  parallel(cssMinify, jsMinify),
+  publish
+);
+Series for running the tasks in a special order, we can also use a parallel order, an error will end the series, but in parallel some functions may running. No synchronus task are supported. When you see the "Did you forget to signal async completion?" warning, none of the techniques mentioned above were used.  So when this error occurs I should take a look if I have to use an error first callback.
+Using async/await
+When not using any of the previous options, you can define your task as an async function, which wraps your task in a promise. This allows you to work with promises synchronously using await and use other synchronous code.
+src() is given a glob to read from the file system and produces a Node stream. It locates all matching files and reads them into memory to pass through the stream.
+dest() can be used in the middle of a pipeline to write intermediate states to the filesystem. Useful when minified and unminified files should be created:
+const { src, dest } = require('gulp');
+const babel = require('gulp-babel');
+const uglify = require('gulp-uglify');
+const rename = require('gulp-rename');
+
+exports.default = function() {
+  return src('src/*.js')
+    .pipe(babel())
+    .pipe(src('vendor/*.js'))
+    .pipe(dest('output/'))
+    .pipe(uglify())
+    .pipe(rename({ extname: '.min.js' }))
+    .pipe(dest('output/'));
+}
+
+in the gulpfile we require the packages we need
+const gulpPackage = require('gulpPackage') 
+
+creating a task
+
+gulp.task('[Function Name]', function(){    
+   // Do stuff here 
+}
+
+gulp <Functionname>
+
+Some of the main functions that we’ll be using are:
+
+.task() — Creates a task, as mentioned above
+.src() — identifies what files you will be compiling in a particular task
+.pipe() — adds a function to the Node stream that Gulp is using; you can pipe multiple functions in the same task (read an excellent write-up on this topic on florian.ec)
+.dest() — writes the resulting file to a specific location
+.watch() — identifies the files to detect any changes
+
+
+
+
+
+
+
+
+
+
+
+
+     
+
+
+
